@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<html lang="es">
+<!-- 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ -     ABM USANDO BASES DE DATOS SQLITE Y HTML5          -
+ -   WEB: http://fernando-gaitan.com.ar/html5-database/  -
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-->
+
+ <head>
+ <title>HTML5 Y SQLite</title>
+ 
+<STYLE type="text/css">
+/* Curso "Páginas web con PHP"
+   Bartolomé Sintes Marco
+   http://www.mclibre.org
+
+   CSS soluciones de los ejercicios
+   22 de enero de 2008
+*/
+
+body { 
+  background-color: #F6F6FF; 
+  font-family: sans-serif; 
+  padding: 0 20px;
+}
+
+h1 { 
+  margin: 10px;
+  font-size: 140%;
+  text-align: center; 
+  text-transform: uppercase; 
+}
+
+h2 { 
+  margin: 10px;
+  font-size: 120%;
+  text-align: center; 
+  text-transform: uppercase; 
+}
+
+fieldset { 
+  background-color: #E6E6FF;
+  border: #8686FF 3px solid; 
+  padding: 10px 20px 20px;
+} 
+
+legend { 
+  background-color: white; 
+  border: #8686FF 3px solid; 
+  font-size: 120%; 
+  padding: 0px 10px; 
+}
+
+input { 
+  font-family: monospace; 
+}
+
+.der { 
+  text-align: right; 
+  margin: 10px 0px; 
+}
+
+address { 
+  clear: both;
+  border-top: black solid 1px; 
+  margin-top: 10px; 
+  padding-top: 5px; 
+}
+
+p.licencia { 
+  text-align: center; 
+}
+</STYLE>
+	
+ <script language="JavaScript">
+ //Esto se agrega en el boton Eliminar ==> onClick='return confirmar()
+  function confirmar(){
+    respuesta_a_eliminar = confirm("¿Seguro que desea eliminar?");
+    return respuesta_a_eliminar;
+  }
+ </script>
+ 
+ <script type="text/javascript">
+       var db = null;
+       function iniciarDB(){
+          abrirDB();
+          crearTablas();
+       }
+       function abrirDB(){
+          try{
+             db = openDatabase('db_test', '1.0', 'Database Prueba', 200000);
+          }catch(e){
+             document.write('La aplicacion no soporta html5 database.');
+          }
+       }
+       function crearTablas(){
+          db.transaction(function(tx){
+             tx.executeSql('CREATE TABLE IF NOT EXISTS instrumento(ide integer primary key autoincrement, nombre text)');
+          });
+       }
+       function guardarInstrumento(nombre, ide, funcion_de_respuesta){
+          if(ide){
+             db.transaction(function(tx){
+                tx.executeSql('UPDATE instrumento SET nombre = ? WHERE ide = ?', [nombre, ide], function(){
+        funcion_de_respuesta(true);
+                }, function(){
+                   funcion_de_respuesta(false);
+                });
+             });
+         }else{
+            db.transaction(function(tx){
+               tx.executeSql('INSERT INTO instrumento(nombre) VALUES(?)', [nombre], function(tx, respuesta){
+                    funcion_de_respuesta(true);
+               }, function(tx, respuesta){
+                    funcion_de_respuesta(false);
+               });
+            });
+         }
+      }
+      function eliminarInstrumento(ide, funcion_de_respuesta){
+	     confirmar();
+		 if(respuesta_a_eliminar){
+         db.transaction(function(tx){
+            tx.executeSql('DELETE FROM instrumento WHERE ide = ?', [ide], function(){
+               funcion_de_respuesta(true);
+            }, function(){
+               funcion_de_respuesta(false);
+            });
+         });
+		 }
+      }
+      function cargarInstrumentoPorId(ide, funcion_de_respuesta){
+         var instrumento_item = {
+            ide: null,
+            nombre: null
+         };
+         db.transaction(function(tx){
+            tx.executeSql('SELECT ide, nombre FROM instrumento WHERE ide = ?', [ide], function(tx, respuesta){
+               instrumento_item.ide = respuesta.rows.item(0).ide;
+               instrumento_item.nombre = respuesta.rows.item(0).nombre;
+               funcion_de_respuesta(true, instrumento_item);
+            }, function(tx, respuesta){
+               funcion_de_respuesta(false, instrumento_item);
+            });
+         });
+      }
+      function cargarInstrumentos(funcion_de_respuesta){
+         var lista = new Array();
+         db.transaction(function(tx){
+            tx.executeSql('SELECT ide, nombre FROM instrumento', [], function(tx, respuesta){
+               for(var i = 0; i < respuesta.rows.length; i++){
+                  lista.push({
+                     ide: respuesta.rows.item(i).ide,
+                     nombre: respuesta.rows.item(i).nombre
+                  });
+               }
+               funcion_de_respuesta(true, lista);
+            }, function(){
+               funcion_de_respuesta(false, lista);
+            });
+         });
+      }
+      function mostrarInstrumentos(lista){
+         document.getElementById('lista').innerHTML = '';
+         var ide;
+         var nombre;
+         var item;
+         for(var i = 0; i < lista.length; i++){
+            ide = lista[i].ide;
+            nombre = lista[i].nombre;
+            item = crearItemInstrumento(ide, nombre);
+            document.getElementById('lista').appendChild(item);
+         }
+      }
+      function crearItemInstrumento(ide, nombre){
+         var li = document.createElement('li');
+         var nombre_item = document.createElement('p');
+         nombre_item.innerHTML = nombre;
+         var boton_modificar = document.createElement('input');
+         boton_modificar.type = 'button';
+         boton_modificar.value = 'Modificar';
+         boton_modificar.onclick = function(){
+            cargarInstrumentoPorId(ide, function(respuesta, instrumento){
+               if(respuesta){
+                  document.getElementById('nombre_instrumento').value = instrumento.nombre;
+                  document.getElementById('ide_instrumento').value = instrumento.ide;
+               }else{
+                  alert('Error al cargar el instrumento')
+               }
+            });
+        }
+        var boton_eliminar = document.createElement('input');
+        boton_eliminar.type = 'button';
+        boton_eliminar.value = 'Eliminar';
+        boton_eliminar.onclick = function(){
+           eliminarInstrumento(ide, function(respuesta){
+              if(respuesta){
+                 refrescarListaInstrumentos();
+                 alert('El instrumento ha sido eliminado');
+              }else{
+                 alert('Error al intentar eliminar el instrumento')
+              }
+           });
+       }
+       li.appendChild(nombre_item);
+       li.appendChild(boton_modificar);
+       li.appendChild(boton_eliminar);
+       return li;
+    }
+    function refrescarListaInstrumentos(){
+       cargarInstrumentos(function(respuesta, lista){
+          if(respuesta){
+             mostrarInstrumentos(lista);
+          }else{
+             alert('No se han podido cargar la lista de instrumentos');
+          }
+       });
+    }
+    window.onload = function(){
+       iniciarDB();
+       refrescarListaInstrumentos();
+       document.getElementById('boton_guardar').onclick = function(){
+          if(document.getElementById('formulario').checkValidity()){
+             var nombre_instrumento = document.getElementById('nombre_instrumento');
+             var ide_instrumento = document.getElementById('ide_instrumento');
+             guardarInstrumento(nombre_instrumento.value, ide_instrumento.value, function(respuesta){
+                if(respuesta){
+                   nombre_instrumento.value = '';
+                   ide_instrumento.value = '';
+                   refrescarListaInstrumentos();
+                   alert('El registro ha sido guardado con exito');
+                }else{
+                   alert('El registro no ha podido ser guardado');
+                }
+             });
+          }
+       };
+    }
+ </script>
+ </head>
+ <body>
+    <h5>Base: db_test</h5>
+	<h5>Tabla: intrumento</h5>
+    <fieldset>
+    <legend>Instrumentos Musicales:</legend>
+    <form id="formulario" action="javascript:void(0);">
+       <ul id="lista"></ul>
+       <label> Instrumento: </label>
+       <input type="text" id="nombre_instrumento" required />
+       <input type="hidden" id="ide_instrumento" />
+       <input type="submit" id="boton_guardar" value="Guardar" />
+    </form>
+	</fieldset>
+ </body>
+</html>
